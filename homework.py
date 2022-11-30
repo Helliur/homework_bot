@@ -35,10 +35,10 @@ logging.basicConfig(
 def check_tokens():
     """Проверка доступности токенов."""
     tokens = {
-            PRACTICUM_TOKEN,
-            TELEGRAM_TOKEN,
-            TELEGRAM_CHAT_ID
-        }
+        PRACTICUM_TOKEN,
+        TELEGRAM_TOKEN,
+        TELEGRAM_CHAT_ID,
+    }
     for token in tokens:
         if token is None:
             logging.critical(f'{token} отсутствует')
