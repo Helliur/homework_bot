@@ -26,7 +26,8 @@ HOMEWORK_VERDICTS = {
 }
 
 logging.basicConfig(
-    format='%(asctime)s - %(levelname)s - %(message)s - %(lineno)d - %(funcName)s',
+    format='%(asctime)s - %(levelname)s'
+    '- %(message)s - %(lineno)d - %(funcName)s',
     level=logging.DEBUG,
     filename='main.log',
     filemode='w'
@@ -134,7 +135,7 @@ def main():
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             send_message(bot, message)
-        finally: 
+        finally:
             time.sleep(RETRY_PERIOD)
 
 
