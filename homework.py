@@ -26,8 +26,13 @@ HOMEWORK_VERDICTS = {
 }
 
 logging.basicConfig(
-    format='%(asctime)s - %(levelname)s'
-    '- %(message)s - %(lineno)d - %(funcName)s',
+    format=(
+        '%(asctime)s - %(levelname)s'
+        '- %(message)s - %(lineno)d - %(funcName)s'
+    ),
+    # Из-за единого центра регистрации сообщений об ошибках, ошибки error
+    # в логах всегда указывают на одну и ту же строчку и функцию,
+    # из-за чего %(lineno)d не приносит особой пользы :(
     level=logging.DEBUG,
     filename='main.log',
     filemode='w'
@@ -52,11 +57,13 @@ def check_tokens():
 def send_message(bot, message):
     """Бот отправляет сообщение."""
     try:
-        bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
-    except telegram.TelegramError:
-        logging.error('Ошибка при отправке сообщения')
+        bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message) 
+    except telegram.TelegramError as message:
+        logging.error(f'Ошибка при отправке сообщения: {message}')
     else:
         logging.debug('Сообщение успешно отправлено')
+# в send_message я пытался избавиться от логирования, но,
+# к сожалению, тесты выдают ошибку, если я не логирую события в этой функции
 
 
 def get_api_answer(timestamp):
@@ -66,11 +73,9 @@ def get_api_answer(timestamp):
         response = requests.get(ENDPOINT, headers=HEADERS, params=params)
     except requests.exceptions.RequestException:
         message = f'Ошибка при запросе к API: {response.status_code}'
-        logging.error(message)
         raise requests.exceptions.RequestException(message)
     if response.status_code != HTTPStatus.OK:
         response.raise_for_status()
-        logging.error('API недоступен')
     logging.info('Ответ на запрос к API: 200 OK')
     return response.json()
 
@@ -78,13 +83,10 @@ def get_api_answer(timestamp):
 def check_response(response):
     """Проверяем правильность ответа API."""
     if not isinstance(response, dict):
-        logging.error('API возвращает не словарь.')
         raise TypeError('API возвращает не словарь.')
     if 'homeworks' not in response:
-        logging.error('Не найден ключ homeworks.')
         raise KeyError('Не найден ключ homeworks.')
     if not isinstance(response.get('homeworks'), list):
-        logging.error('API возвращает не список.')
         raise TypeError('API возвращает не список.')
     return response.get('homeworks')
 
@@ -92,21 +94,16 @@ def check_response(response):
 def parse_status(homework):
     """Проверяем статус домашней работы."""
     if not isinstance(homework, dict):
-        logging.error('API возвращает не словарь.')
         raise KeyError('API возвращает не словарь.')
     if 'status' not in homework:
-        logging.error('В ответе нет homework_name.')
         raise KeyError('В ответе нет homework_name.')
     if 'homework_name' not in homework:
-        logging.error('В ответе нет homework_name.')
         raise KeyError('В ответе нет homework_name.')
     if not isinstance(homework.get('status'), str):
-        logging.error('status не str.')
         raise TypeError('status не str.')
     homework_name = homework.get('homework_name')
     homework_status = homework.get('status')
     if homework_status not in HOMEWORK_VERDICTS:
-        logging.error('Неизвестный статус работы')
         raise Exception('Неизвестный статус работы')
     verdict = HOMEWORK_VERDICTS.get(homework_status)
     return (
@@ -134,6 +131,7 @@ def main():
                 logging.info("Новые задания не обнаружены")
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
+            logging.error(message)
             send_message(bot, message)
         finally:
             time.sleep(RETRY_PERIOD)
