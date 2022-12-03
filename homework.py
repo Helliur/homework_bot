@@ -25,18 +25,24 @@ HOMEWORK_VERDICTS = {
     'reviewing': 'Работа взята на проверку ревьюером.',
 }
 
-logging.basicConfig(
-    format=(
-        '%(asctime)s - %(levelname)s'
-        '- %(message)s - %(lineno)d - %(funcName)s'
-    ),
-    # Из-за единого центра регистрации сообщений об ошибках, ошибки error
-    # в логах всегда указывают на одну и ту же строчку и функцию,
-    # из-за чего %(lineno)d не приносит особой пользы :(
-    level=logging.DEBUG,
-    filename='main.log',
-    filemode='w'
-)
+
+class WrongAPIResponseCodeError(Exception):
+    """Ошибка при неправильном коде ответа на запрос к API."""
+
+    def __init__(self, response, params):
+        """Создание экземпляра исключения."""
+        self.params = params
+        self.status_code = response.status_code
+        self.reason = response.reason
+
+    def __str__(self):
+        """Вывод экземпляра на экран."""
+        message = (
+            f'Ошибка выполнения запроса: {self.reason}, '
+            f'код ответа: {self.status_code}, '
+            f'параметры запроса: {self.params}, '
+        )
+        return message
 
 
 def check_tokens():
@@ -62,8 +68,6 @@ def send_message(bot, message):
         logging.error(f'Ошибка при отправке сообщения: {message}')
     else:
         logging.debug('Сообщение успешно отправлено')
-# в send_message я пытался избавиться от логирования, но,
-# к сожалению, тесты выдают ошибку, если я не логирую события в этой функции
 
 
 def get_api_answer(timestamp):
@@ -75,7 +79,7 @@ def get_api_answer(timestamp):
         message = f'Ошибка при запросе к API: {response.status_code}'
         raise requests.exceptions.RequestException(message)
     if response.status_code != HTTPStatus.OK:
-        response.raise_for_status()
+        raise WrongAPIResponseCodeError(response, params)
     logging.info('Ответ на запрос к API: 200 OK')
     return response.json()
 
@@ -99,13 +103,11 @@ def parse_status(homework):
         raise KeyError('В ответе нет homework_name.')
     if 'homework_name' not in homework:
         raise KeyError('В ответе нет homework_name.')
-    if not isinstance(homework.get('status'), str):
-        raise TypeError('status не str.')
-    homework_name = homework.get('homework_name')
-    homework_status = homework.get('status')
+    homework_name = homework['homework_name']
+    homework_status = homework['status']
     if homework_status not in HOMEWORK_VERDICTS:
         raise Exception('Неизвестный статус работы')
-    verdict = HOMEWORK_VERDICTS.get(homework_status)
+    verdict = HOMEWORK_VERDICTS[homework_status]
     return (
         'Изменился статус проверки работы '
         f'"{homework_name}". {verdict}'
@@ -123,12 +125,12 @@ def main():
         try:
             response_result = get_api_answer(timestamp)
             homeworks = check_response(response_result)
-            logging.info("Список домашних работ получен")
+            logging.info('Список домашних работ получен')
             if len(homeworks) > 0:
                 send_message(bot, parse_status(homeworks[0]))
                 timestamp = response_result['current_date']
             else:
-                logging.info("Новые задания не обнаружены")
+                logging.info('Новые задания не обнаружены')
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             logging.error(message)
@@ -138,4 +140,13 @@ def main():
 
 
 if __name__ == '__main__':
+    logging.basicConfig(
+        format=(
+            '%(asctime)s - %(levelname)s'
+            '- %(message)s - %(lineno)d - %(funcName)s'
+        ),
+        level=logging.DEBUG,
+        filename='main.log',
+        filemode='w'
+    )
     main()
